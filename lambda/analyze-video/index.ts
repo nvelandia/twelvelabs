@@ -25,12 +25,14 @@ async function tlFetch(path: string, options: RequestInit = {}): Promise<Respons
 }
 
 async function uploadToTwelveLabs(videoUrl: string): Promise<string> {
-  const res = await tlFetch('/tasks', {
+  const form = new FormData();
+  form.append('index_id', TWELVELABS_INDEX_ID);
+  form.append('video_url', videoUrl);
+
+  const res = await fetch(`${TWELVELABS_BASE}/tasks`, {
     method: 'POST',
-    body: JSON.stringify({
-      index_id: TWELVELABS_INDEX_ID,
-      video_url: videoUrl,
-    }),
+    headers: { 'x-api-key': TWELVELABS_API_KEY },
+    body: form,
   });
 
   if (!res.ok) {
@@ -91,11 +93,14 @@ async function analyzeWithPegasus(videoId: string): Promise<unknown> {
     throw new Error(`TwelveLabs analyze failed (${res.status}): ${body}`);
   }
 
-  const data = await res.json() as { data?: string };
-  const rawText = data.data ?? JSON.stringify(data);
+  const rawText = await res.text();
+  console.log('Pegasus raw response:', rawText.slice(0, 500));
 
   try {
-    return JSON.parse(rawText);
+    const parsed = JSON.parse(rawText);
+    // si viene envuelto en { data: "..." }, extraer el texto interno
+    const inner = (parsed as { data?: string }).data;
+    return inner ? JSON.parse(inner) : parsed;
   } catch {
     console.log('Could not parse Pegasus response as JSON, saving raw text');
     return rawText;

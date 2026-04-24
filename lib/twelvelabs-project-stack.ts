@@ -38,6 +38,9 @@ export class TwelvelabsProjectStack extends cdk.Stack {
       bundling: {
         externalModules: [],
       },
+      // sin reintentos automáticos — cada fallo se investiga en los logs
+      maxEventAge: cdk.Duration.hours(1),
+      retryAttempts: 0,
     });
 
     bucket.addToResourcePolicy(new iam.PolicyStatement({
