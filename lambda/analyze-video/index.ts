@@ -5,7 +5,6 @@ import type { S3Event } from 'aws-lambda';
 const s3 = new S3Client({});
 
 const TWELVELABS_API_KEY = process.env.TWELVELABS_API_KEY!;
-const TWELVELABS_INDEX_ID = process.env.TWELVELABS_INDEX_ID!;
 const OUTPUT_BUCKET = process.env.OUTPUT_BUCKET!;
 const OUTPUT_PREFIX = process.env.OUTPUT_PREFIX!;
 
@@ -24,43 +23,83 @@ async function tlFetch(path: string, options: RequestInit = {}): Promise<Respons
   });
 }
 
-async function uploadToTwelveLabs(videoUrl: string): Promise<string> {
-  const form = new FormData();
-  form.append('index_id', TWELVELABS_INDEX_ID);
-  form.append('video_url', videoUrl);
-
-  const res = await fetch(`${TWELVELABS_BASE}/tasks`, {
+async function createAnalyzeTask(videoUrl: string): Promise<string> {
+  const res = await tlFetch('/analyze/tasks', {
     method: 'POST',
-    headers: { 'x-api-key': TWELVELABS_API_KEY },
-    body: form,
+    body: JSON.stringify({
+      video: {
+        type: 'url',
+        url: videoUrl,
+      },
+      model_name: 'pegasus1.5',
+      analysis_mode: 'time_based_metadata',
+      response_format: {
+        type: 'segment_definitions',
+        segment_definitions: [
+          {
+            id: 'goals',
+            description: 'Detect every goal scored in this soccer match, including the moment the ball enters the net and the immediate celebration',
+            fields: [
+              {
+                name: 'team',
+                type: 'string',
+                description: 'The team that scored the goal',
+                enum: ['home', 'away', 'unknown'],
+              },
+              {
+                name: 'description',
+                type: 'string',
+                description: 'Brief description of how the goal was scored',
+              },
+              {
+                name: 'scorer',
+                type: 'string',
+                description: 'Name of the player who scored, if identifiable from the video',
+              },
+            ],
+          },
+        ],
+      },
+    }),
   });
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`TwelveLabs task creation failed (${res.status}): ${body}`);
+    throw new Error(`TwelveLabs analyze task creation failed (${res.status}): ${body}`);
   }
 
-  const data = await res.json() as { _id: string };
-  console.log('Task created:', data._id);
-  return data._id;
+  const data = await res.json() as { task_id: string };
+  console.log('Analyze task created:', data.task_id);
+  return data.task_id;
 }
 
-async function pollUntilReady(taskId: string): Promise<string> {
+async function pollUntilReady(taskId: string): Promise<unknown> {
   const deadline = Date.now() + POLL_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
-    const res = await tlFetch(`/tasks/${taskId}`);
+    const res = await tlFetch(`/analyze/tasks/${taskId}`);
     if (!res.ok) {
       const body = await res.text();
       throw new Error(`TwelveLabs poll failed (${res.status}): ${body}`);
     }
 
-    const data = await res.json() as { status: string; video_id?: string };
+    const data = await res.json() as {
+      status: string;
+      result?: { data: string; finish_reason?: string };
+    };
     console.log(`Task ${taskId} status: ${data.status}`);
 
     if (data.status === 'ready') {
-      if (!data.video_id) throw new Error('Task ready but no video_id returned');
-      return data.video_id;
+      if (data.result?.finish_reason === 'length') {
+        console.log('Warning: finish_reason is "length" — response may be truncated');
+      }
+      const rawData = data.result?.data ?? '';
+      try {
+        return JSON.parse(rawData);
+      } catch {
+        console.log('Could not parse result.data as JSON, saving raw string');
+        return rawData;
+      }
     }
 
     if (data.status === 'failed') {
@@ -71,40 +110,6 @@ async function pollUntilReady(taskId: string): Promise<string> {
   }
 
   throw new Error(`Polling timeout after ${POLL_TIMEOUT_MS / 1000}s for task ${taskId}`);
-}
-
-async function analyzeWithPegasus(videoId: string): Promise<unknown> {
-  const prompt = [
-    'Analyze this soccer match video.',
-    'Identify every goal scored.',
-    'Return ONLY a valid JSON object with this schema:',
-    '{ "goals": [{ "timestamp_start_seconds": number, "timestamp_end_seconds": number,',
-    '"team": "home" | "away" | "unknown", "description": string }], "total_goals": number }.',
-    'Do not include any text outside the JSON.',
-  ].join(' ');
-
-  const res = await tlFetch('/analyze', {
-    method: 'POST',
-    body: JSON.stringify({ video_id: videoId, prompt }),
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`TwelveLabs analyze failed (${res.status}): ${body}`);
-  }
-
-  const rawText = await res.text();
-  console.log('Pegasus raw response:', rawText.slice(0, 500));
-
-  try {
-    const parsed = JSON.parse(rawText);
-    // si viene envuelto en { data: "..." }, extraer el texto interno
-    const inner = (parsed as { data?: string }).data;
-    return inner ? JSON.parse(inner) : parsed;
-  } catch {
-    console.log('Could not parse Pegasus response as JSON, saving raw text');
-    return rawText;
-  }
 }
 
 export async function handler(event: S3Event): Promise<void> {
@@ -126,9 +131,8 @@ export async function handler(event: S3Event): Promise<void> {
         { expiresIn: 3600 },
       );
 
-      const taskId = await uploadToTwelveLabs(presignedUrl);
-      const videoId = await pollUntilReady(taskId);
-      const result = await analyzeWithPegasus(videoId);
+      const taskId = await createAnalyzeTask(presignedUrl);
+      const result = await pollUntilReady(taskId);
 
       const videoName = key.replace(/^input\//, '').replace(/\.mp4$/, '');
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -137,8 +141,9 @@ export async function handler(event: S3Event): Promise<void> {
       const output = {
         source_video: key,
         analyzed_at: new Date().toISOString(),
-        twelvelabs_video_id: videoId,
         twelvelabs_task_id: taskId,
+        model: 'pegasus1.5',
+        analysis_mode: 'time_based_metadata',
         result,
       };
 

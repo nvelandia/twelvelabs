@@ -9,7 +9,6 @@ import * as path from 'path';
 
 interface TwelvelabsProjectStackProps extends cdk.StackProps {
   twelvelabsApiKey: string;
-  twelvelabsIndexId: string;
 }
 
 export class TwelvelabsProjectStack extends cdk.Stack {
@@ -28,10 +27,9 @@ export class TwelvelabsProjectStack extends cdk.Stack {
       entry: path.join(__dirname, '../lambda/analyze-video/index.ts'),
       handler: 'handler',
       timeout: cdk.Duration.minutes(15),
-      memorySize: 512,
+      memorySize: 1024,
       environment: {
         TWELVELABS_API_KEY: props.twelvelabsApiKey,
-        TWELVELABS_INDEX_ID: props.twelvelabsIndexId,
         OUTPUT_BUCKET: bucket.bucketName,
         OUTPUT_PREFIX: 'output/',
       },

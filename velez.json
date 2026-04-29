@@ -1,0 +1,83 @@
+{
+  "source_video": "input/velez.mp4",
+  "analyzed_at": "2026-04-28T20:17:41.018Z",
+  "twelvelabs_task_id": "69f1153bf8642679d22edaae",
+  "model": "pegasus1.5",
+  "analysis_mode": "time_based_metadata",
+  "result": {
+    "goals": [
+      {
+        "end_time": 135,
+        "metadata": {
+          "description": "Antonio Barijo scores for Boca Juniors after a deflection off the goalkeeper.",
+          "scorer": "Antonio Barijo",
+          "team": "home"
+        },
+        "start_time": 118
+      },
+      {
+        "end_time": 247,
+        "metadata": {
+          "description": "Rolando Schiavi scores for Boca Juniors from a corner kick.",
+          "scorer": "Rolando Schiavi",
+          "team": "home"
+        },
+        "start_time": 224
+      },
+      {
+        "end_time": 341,
+        "metadata": {
+          "description": "Matias Vuoso scores for Independiente with a powerful shot into the top corner.",
+          "scorer": "Matias Vuoso",
+          "team": "away"
+        },
+        "start_time": 321
+      },
+      {
+        "end_time": 715,
+        "metadata": {
+          "description": "Juan Roman Riquelme scores a spectacular long-range goal for Boca Juniors.",
+          "scorer": "Juan Roman Riquelme",
+          "team": "home"
+        },
+        "start_time": 686
+      },
+      {
+        "end_time": 1101,
+        "metadata": {
+          "description": "Guillermo Barros Schelotto scores for Boca Juniors from a free-kick.",
+          "scorer": "Guillermo Barros Schelotto",
+          "team": "home"
+        },
+        "start_time": 1078
+      },
+      {
+        "end_time": 1323,
+        "metadata": {
+          "description": "Juan Eluchans scores for Independiente with a header from a cross.",
+          "scorer": "Juan Eluchans",
+          "team": "away"
+        },
+        "start_time": 1301
+      },
+      {
+        "end_time": 1516,
+        "metadata": {
+          "description": "Diego Forlan scores for Independiente with a left-footed shot.",
+          "scorer": "Diego Forlan",
+          "team": "away"
+        },
+        "start_time": 1494
+      },
+      {
+        "end_time": 1593,
+        "metadata": {
+          "description": "Juan Roman Riquelme scores his second goal for Boca Juniors with a bicycle kick.",
+          "scorer": "Juan Roman Riquelme",
+          "team": "home"
+        },
+        "start_time": 1569
+      }
+    ]
+  }
+}
